@@ -66,14 +66,49 @@
   initTheme();
 
   // ===========================================================================
-  // API KEY MANAGEMENT
+  // PROVIDERS + API KEY MANAGEMENT
   // ===========================================================================
-  var KEY_STORAGE = "decoder.anthropicKey";
+  // Decoder is BYO-key. It supports more than one LLM provider; each provider
+  // stores its own key in localStorage. The active provider is also persisted.
+  //
+  //   - anthropic : Anthropic Messages API (the original, default).
+  //   - gemini    : Google Gemini via its OpenAI-compatible endpoint. Free tier
+  //                 friendly and the same path the Node test harness uses.
+  var PROVIDERS = {
+    anthropic: {
+      label: "Anthropic Claude",
+      keyStorage: "decoder.anthropicKey",
+      placeholder: "sk-ant-...",
+      keyUrl: "https://console.anthropic.com/settings/keys",
+      keyUrlLabel: "console.anthropic.com",
+      note: "Browser calls use Anthropic's direct-browser-access opt-in, which Decoder sends for you."
+    },
+    gemini: {
+      label: "Gemini (free)",
+      keyStorage: "decoder.geminiKey",
+      placeholder: "AIza...",
+      keyUrl: "https://aistudio.google.com/apikey",
+      keyUrlLabel: "aistudio.google.com",
+      note: "Free tier friendly. Uses Google's OpenAI-compatible endpoint — also the path the Node test harness uses. Works in-browser when Google returns CORS headers; if your network blocks it, use the free Node test (npm run test:e2e)."
+    }
+  };
+  var PROVIDER_STORAGE = "decoder.provider";
 
-  function getKey() { return localStorage.getItem(KEY_STORAGE) || ""; }
-  function setKey(v) {
-    if (v) localStorage.setItem(KEY_STORAGE, v);
-    else localStorage.removeItem(KEY_STORAGE);
+  function getProvider() {
+    var p = localStorage.getItem(PROVIDER_STORAGE);
+    return PROVIDERS[p] ? p : "anthropic";
+  }
+  function setProvider(p) {
+    if (PROVIDERS[p]) localStorage.setItem(PROVIDER_STORAGE, p);
+  }
+
+  function getKey(provider) {
+    return localStorage.getItem(PROVIDERS[provider || getProvider()].keyStorage) || "";
+  }
+  function setKey(v, provider) {
+    var store = PROVIDERS[provider || getProvider()].keyStorage;
+    if (v) localStorage.setItem(store, v);
+    else localStorage.removeItem(store);
     refreshKeyButton();
   }
   function refreshKeyButton() {
@@ -84,29 +119,56 @@
 
   var keyDialog = $("#keyDialog");
   var keyInput = $("#keyInput");
+  var providerSelect = $("#providerSelect");
   var lastFocused = null;
+
+  // Reflect the selected provider in the dialog: swap the key field's value,
+  // placeholder, "get a key" link, and the provider-specific note.
+  function syncDialogToProvider() {
+    var prov = providerSelect ? providerSelect.value : getProvider();
+    var cfg = PROVIDERS[prov] || PROVIDERS.anthropic;
+    keyInput.value = getKey(prov);
+    keyInput.placeholder = cfg.placeholder;
+    var link = $("#keyGetLink");
+    if (link) { link.href = cfg.keyUrl; link.textContent = cfg.keyUrlLabel; }
+    var note = $("#keyProviderNote");
+    if (note) note.textContent = cfg.note;
+  }
 
   function openKeyDialog() {
     lastFocused = document.activeElement;
-    keyInput.value = getKey();
+    if (providerSelect) providerSelect.value = getProvider();
+    syncDialogToProvider();
     keyInput.type = "password";
     $("#keyShow").checked = false;
     keyDialog.hidden = false;
-    keyInput.focus();
+    if (providerSelect) providerSelect.focus(); else keyInput.focus();
   }
   function closeKeyDialog() {
     keyDialog.hidden = true;
     if (lastFocused && lastFocused.focus) lastFocused.focus();
   }
 
+  // Persist the chosen provider AND its key together, so switching provider in
+  // the dropdown then Save does the intuitive thing.
+  function saveDialog() {
+    var prov = providerSelect ? providerSelect.value : getProvider();
+    setProvider(prov);
+    setKey(keyInput.value.trim(), prov);
+  }
+
   $("#keyBtn").addEventListener("click", openKeyDialog);
   $("#keyCancel").addEventListener("click", closeKeyDialog);
+  if (providerSelect) {
+    providerSelect.addEventListener("change", syncDialogToProvider);
+  }
   $("#keySave").addEventListener("click", function () {
-    setKey(keyInput.value.trim());
+    saveDialog();
     closeKeyDialog();
   });
   $("#keyClear").addEventListener("click", function () {
-    setKey("");
+    var prov = providerSelect ? providerSelect.value : getProvider();
+    setKey("", prov);
     keyInput.value = "";
     closeKeyDialog();
   });
@@ -114,7 +176,7 @@
     keyInput.type = e.target.checked ? "text" : "password";
   });
   keyInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { setKey(keyInput.value.trim()); closeKeyDialog(); }
+    if (e.key === "Enter") { saveDialog(); closeKeyDialog(); }
   });
   keyDialog.addEventListener("click", function (e) {
     if (e.target === keyDialog) closeKeyDialog();
@@ -125,20 +187,25 @@
   refreshKeyButton();
 
   // ===========================================================================
-  // ANTHROPIC MESSAGES API — direct browser call, BYO key
+  // LLM CALLS — direct browser call, BYO key, per-provider
   // ===========================================================================
+  // Anthropic Messages API (the original/default).
   var MODEL = "claude-opus-4-8";
   var API_URL = "https://api.anthropic.com/v1/messages";
 
-  // Calls the Messages API and returns the concatenated text content.
-  // Throws an Error with a human-readable message on failure.
-  function callClaude(system, userText, maxTokens) {
-    var key = getKey();
-    if (!key) {
-      var e = new Error("No API key set. Click “Set API key” in the top right to add yours.");
-      e.code = "NO_KEY";
-      return Promise.reject(e);
-    }
+  // Google Gemini via its OpenAI-compatible chat/completions endpoint. This is
+  // the exact request shape the Node test harness uses, and the free path.
+  var GEMINI_MODEL = "gemini-2.0-flash";
+  var GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+  function noKeyError() {
+    var e = new Error("No API key set. Click “Set API key” in the top right to add yours.");
+    e.code = "NO_KEY";
+    return e;
+  }
+
+  // --- Anthropic ---
+  function callAnthropic(key, system, userText, maxTokens) {
     return fetch(API_URL, {
       method: "POST",
       headers: {
@@ -177,6 +244,59 @@
       }
       throw err;
     });
+  }
+
+  // --- Gemini (OpenAI-compatible) ---
+  // The system prompt is mapped to an OpenAI "system" message; the user turn to
+  // a "user" message. Response is parsed from choices[0].message.content.
+  function callGemini(key, system, userText, maxTokens) {
+    var messages = [];
+    if (system) messages.push({ role: "system", content: system });
+    messages.push({ role: "user", content: userText });
+    return fetch(GEMINI_API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": "Bearer " + key
+      },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens || 1200,
+        messages: messages
+      })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
+    }).then(function (r) {
+      if (!r.ok) {
+        var msg = (r.data && r.data.error && r.data.error.message) || ("Request failed (HTTP " + r.status + ").");
+        if (r.status === 401 || r.status === 403) msg = "Your Gemini API key was rejected (" + r.status + "). Check it under “Set API key”.";
+        else if (r.status === 429) msg = "Rate limited (429). Wait a moment and try again.";
+        var err = new Error(msg);
+        err.status = r.status;
+        throw err;
+      }
+      var choice = (r.data && r.data.choices && r.data.choices[0]) || null;
+      var text = choice && choice.message && choice.message.content;
+      if (!text) throw new Error("The model returned an empty response. Try again.");
+      return text;
+    }).catch(function (err) {
+      if (err && err.status == null && err.code !== "NO_KEY") {
+        throw new Error("Could not reach the Gemini API from the browser. Your network may be blocking it (CORS); the free Node test (npm run test:e2e) always works.");
+      }
+      throw err;
+    });
+  }
+
+  // Calls the active provider's LLM and returns the response text.
+  // Kept named callClaude so all existing call sites are unchanged; it now
+  // routes by the selected provider. Throws an Error with a human-readable
+  // message on failure.
+  function callClaude(system, userText, maxTokens) {
+    var provider = getProvider();
+    var key = getKey(provider);
+    if (!key) return Promise.reject(noKeyError());
+    if (provider === "gemini") return callGemini(key, system, userText, maxTokens);
+    return callAnthropic(key, system, userText, maxTokens);
   }
 
   // ===========================================================================
@@ -541,10 +661,11 @@
   // ===========================================================================
   function showLoading(container, label) {
     container.innerHTML = "";
+    var modelName = getProvider() === "gemini" ? "Gemini" : "Claude";
     container.appendChild(el("div", { class: "ai-card" }, [
       el("div", { class: "loading" }, [
         el("span", { class: "spinner" }),
-        document.createTextNode(label || "Asking Claude…")
+        document.createTextNode(label || ("Asking " + modelName + "…"))
       ])
     ]));
   }

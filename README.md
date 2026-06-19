@@ -30,22 +30,45 @@ Three modes:
    - **Generate** — describe what you want and get a single safe one-liner. Decoder never runs commands.
 
 The regex tester and cron parser work **fully offline**. The **Explain** and **Generate** features
-call the [Claude API](https://www.anthropic.com/api) (model `claude-opus-4-8`).
+call an LLM — either Anthropic's [Claude API](https://www.anthropic.com/api) (model `claude-opus-4-8`)
+or **Google Gemini** (model `gemini-2.0-flash`, free-tier friendly).
 
 ## Bring your own key (BYO key)
 
-Decoder has no backend. The Explain/Generate features call Anthropic's
-[Messages API](https://docs.anthropic.com/en/api/messages) **directly from your browser** using a key
-you provide:
+Decoder has no backend. The Explain/Generate features call an LLM **directly from your browser**
+using a key you provide. Open **Set API key** in the top-right, pick a **provider**, and paste your key:
 
-- Click **Set API key** in the top-right and paste your own Anthropic API key.
-- The key is stored only in this browser's `localStorage` and is **never** sent anywhere except
-  `api.anthropic.com`.
-- Browser requests use Anthropic's `anthropic-dangerous-direct-browser-access` opt-in header, which
-  Decoder sends for you so the call isn't blocked by CORS.
-- Get a key at [console.anthropic.com](https://console.anthropic.com/settings/keys).
+- **Anthropic Claude** — calls the [Messages API](https://docs.anthropic.com/en/api/messages).
+  Browser requests use Anthropic's `anthropic-dangerous-direct-browser-access` opt-in header, which
+  Decoder sends for you so the call isn't blocked by CORS. Get a key at
+  [console.anthropic.com](https://console.anthropic.com/settings/keys).
+- **Gemini (free)** — calls Google's OpenAI-compatible endpoint
+  (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`). This has a generous
+  free tier, so it's the cheapest way to try the AI features. Google returns CORS headers for this
+  endpoint, so it works in-browser; if your network blocks it, the free Node test below is the
+  reliable path. Get a key at [aistudio.google.com](https://aistudio.google.com/apikey).
 
-No key is ever hardcoded, committed, or proxied through a server.
+Each provider's key is stored only in this browser's `localStorage` and is **never** sent anywhere
+except that provider's API. No key is ever hardcoded, committed, or proxied through a server.
+
+## Test for free with Gemini
+
+You can verify the AI request/response logic end-to-end for free, without a browser, using Google
+Gemini's free tier:
+
+1. Get a free API key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+2. Run the test (Node 18+, which has built-in `fetch` — no dependencies):
+
+   ```sh
+   GEMINI_API_KEY=your_key npm run test:e2e
+   # or directly:
+   GEMINI_API_KEY=your_key node tests/e2e.mjs
+   ```
+
+It makes **one** tiny call (`max_tokens: 20`, so it costs ~nothing) through the same
+OpenAI-compatible request shape the app uses, asserts the response parses with non-empty text, and
+prints `PASS`. With no key set it prints `SKIP` and exits 0. Because it's a Node script there's no
+CORS involved — it proves the request-building and response-parsing logic against a real model.
 
 ## Run locally
 
@@ -59,21 +82,25 @@ python3 -m http.server 8000
 # then visit http://localhost:8000
 ```
 
-The regex tester and cron parser work immediately. To use Explain/Generate, add your Anthropic key
-via **Set API key**.
+The regex tester and cron parser work immediately. To use Explain/Generate, pick a provider
+(Anthropic or Gemini) and add your key via **Set API key**.
 
 ## Project layout
 
 ```
-index.html   markup + the three mode panels and the API-key dialog
-styles.css   styling (light/dark theme, responsive, accessible)
-app.js       all logic: offline regex + cron engines, the Claude API call, UI wiring
+index.html      markup + the three mode panels and the provider/API-key dialog
+styles.css      styling (light/dark theme, responsive, accessible)
+app.js          all logic: offline regex + cron engines, the LLM calls, UI wiring
+tests/e2e.mjs   free end-to-end LLM test via Gemini's OpenAI-compatible endpoint
+package.json    scripts only (test:e2e) — the site itself needs no build step
 ```
 
 ## Tech
 
 - Plain HTML, CSS, and JavaScript — no framework, no build tooling.
-- [Anthropic Claude API](https://www.anthropic.com/api) for the Explain/Generate features (BYO key).
+- LLM for the Explain/Generate features (BYO key), either the
+  [Anthropic Claude API](https://www.anthropic.com/api) or
+  [Google Gemini](https://ai.google.dev/) via its OpenAI-compatible endpoint.
 
 ## License
 

@@ -1,0 +1,18 @@
+{
+  "name": "decoder",
+  "version": "1.0.0",
+  "description": "Explain and generate regex, cron schedules, and shell one-liners from plain English. Client-side, no build step.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node tests/e2e.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "author": "Vansh Singh",
+  "license": "MIT",
+  "homepage": "https://vansh4195.github.io/decoder/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vansh4195/decoder.git"
+  }
+}
