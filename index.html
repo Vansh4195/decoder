@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decoder — explain &amp; generate regex, cron &amp; shell from plain English</title>
+  <meta name="description" content="Decode regular expressions, cron schedules, and shell one-liners into plain English — and generate them from a description. Runs entirely in your browser." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%8D%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">&#9001;/&#9002;</span>
+        <span class="brand-name">Decoder</span>
+      </div>
+      <div class="topbar-actions">
+        <button id="keyBtn" class="btn btn-ghost" type="button" aria-haspopup="dialog">
+          <span id="keyStatusDot" class="dot dot-off" aria-hidden="true"></span>
+          <span id="keyBtnLabel">Set API key</span>
+        </button>
+        <button id="themeBtn" class="btn btn-icon" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <span class="theme-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    <section class="intro">
+      <h1>Decode the cryptic.</h1>
+      <p class="lede">
+        Paste a regular expression, cron schedule, or shell one-liner and get a plain-English,
+        piece-by-piece breakdown — or describe what you want and generate it. The regex tester
+        runs fully offline, no key needed.
+      </p>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="Decoder modes">
+      <button class="tab is-active" role="tab" id="tab-regex" aria-selected="true" aria-controls="panel-regex" data-mode="regex" type="button">Regex</button>
+      <button class="tab" role="tab" id="tab-cron" aria-selected="false" aria-controls="panel-cron" data-mode="cron" type="button" tabindex="-1">Cron</button>
+      <button class="tab" role="tab" id="tab-shell" aria-selected="false" aria-controls="panel-shell" data-mode="shell" type="button" tabindex="-1">Shell</button>
+    </nav>
+
+    <!-- ============ REGEX ============ -->
+    <section class="panel" id="panel-regex" role="tabpanel" aria-labelledby="tab-regex">
+      <div class="grid">
+        <div class="card">
+          <h2 class="card-title">Live tester <span class="badge badge-offline">no key needed</span></h2>
+          <div class="field">
+            <label for="rxPattern">Regular expression</label>
+            <div class="rx-input-row">
+              <span class="rx-slash" aria-hidden="true">/</span>
+              <input id="rxPattern" class="input mono" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="\b\d{3}-\d{4}\b" aria-describedby="rxError" />
+              <span class="rx-slash" aria-hidden="true">/</span>
+              <input id="rxFlags" class="input mono input-flags" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="gi" aria-label="Regex flags" />
+            </div>
+            <p id="rxError" class="error-text" role="alert" hidden></p>
+          </div>
+          <div class="field">
+            <label for="rxTest">Test string</label>
+            <textarea id="rxTest" class="input mono" rows="5" spellcheck="false" placeholder="Call 555-1234 or 555-9876 today."></textarea>
+          </div>
+          <div class="field">
+            <div class="result-head">
+              <span class="label">Matches</span>
+              <span id="rxMatchCount" class="match-count">0 matches</span>
+            </div>
+            <pre id="rxHighlight" class="highlight" aria-live="polite"></pre>
+          </div>
+          <div id="rxGroups" class="groups" hidden></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Explain</h2>
+          <p class="card-hint">Break the expression above down token by token, in plain English.</p>
+          <button id="rxExplainBtn" class="btn btn-primary" type="button">Explain this regex</button>
+
+          <div class="divider"><span>or</span></div>
+
+          <h2 class="card-title">Generate from a description</h2>
+          <div class="field">
+            <label for="rxDesc">Describe what you want to match</label>
+            <textarea id="rxDesc" class="input" rows="3" placeholder="A US phone number like 555-1234, optionally with a 3-digit area code in parentheses"></textarea>
+          </div>
+          <button id="rxGenBtn" class="btn" type="button">Generate regex</button>
+
+          <div id="rxAiOut" class="ai-out" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CRON ============ -->
+    <section class="panel" id="panel-cron" role="tabpanel" aria-labelledby="tab-cron" hidden>
+      <div class="grid">
+        <div class="card">
+          <h2 class="card-title">Cron expression <span class="badge badge-offline">no key needed</span></h2>
+          <div class="field">
+            <label for="cronExpr">Schedule (5 fields)</label>
+            <input id="cronExpr" class="input mono" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="*/15 9-17 * * 1-5" aria-describedby="cronError" />
+            <p id="cronError" class="error-text" role="alert" hidden></p>
+          </div>
+          <div id="cronBreakdown" class="cron-breakdown" aria-live="polite"></div>
+          <div class="field">
+            <span class="label">Plain English</span>
+            <p id="cronPlain" class="cron-plain" aria-live="polite">Enter a 5-field cron expression above.</p>
+          </div>
+          <div class="examples">
+            <span class="label">Try:</span>
+            <button class="chip mono" type="button" data-cron="*/15 9-17 * * 1-5">*/15 9-17 * * 1-5</button>
+            <button class="chip mono" type="button" data-cron="0 0 * * 0">0 0 * * 0</button>
+            <button class="chip mono" type="button" data-cron="30 2 1 * *">30 2 1 * *</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Explain in detail</h2>
+          <p class="card-hint">Get a fuller, human explanation of the schedule above, including roughly how often it fires.</p>
+          <button id="cronExplainBtn" class="btn btn-primary" type="button">Explain this schedule</button>
+
+          <div class="divider"><span>or</span></div>
+
+          <h2 class="card-title">Generate from a description</h2>
+          <div class="field">
+            <label for="cronDesc">Describe the schedule you want</label>
+            <textarea id="cronDesc" class="input" rows="3" placeholder="Every weekday at 8:30am"></textarea>
+          </div>
+          <button id="cronGenBtn" class="btn" type="button">Generate cron</button>
+
+          <div id="cronAiOut" class="ai-out" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SHELL ============ -->
+    <section class="panel" id="panel-shell" role="tabpanel" aria-labelledby="tab-shell" hidden>
+      <div class="grid">
+        <div class="card">
+          <h2 class="card-title">Shell one-liner</h2>
+          <div class="field">
+            <label for="shellCmd">Command</label>
+            <textarea id="shellCmd" class="input mono" rows="3" spellcheck="false" placeholder="find . -name '*.tmp' -mtime +7 -delete"></textarea>
+          </div>
+          <button id="shellExplainBtn" class="btn btn-primary" type="button">Explain flag by flag</button>
+          <div class="examples">
+            <span class="label">Try:</span>
+            <button class="chip mono" type="button" data-shell="tar -czf backup.tar.gz ./src">tar -czf backup.tar.gz ./src</button>
+            <button class="chip mono" type="button" data-shell="ps aux | grep node | awk '{print $2}'">ps aux | grep node | awk …</button>
+          </div>
+          <div id="shellAiOut" class="ai-out" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Generate from a description</h2>
+          <div class="field">
+            <label for="shellDesc">Describe what you want the command to do</label>
+            <textarea id="shellDesc" class="input" rows="3" placeholder="Delete all .tmp files older than a week under the current directory"></textarea>
+          </div>
+          <button id="shellGenBtn" class="btn" type="button">Generate command</button>
+          <p class="card-hint warn">Always read a generated command before running it. Decoder never runs commands for you.</p>
+          <div id="shellGenOut" class="ai-out" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Decoder runs entirely in your browser. Your API key is stored only in this browser's
+      <code>localStorage</code> and is sent directly to Anthropic — never to any other server.
+    </p>
+    <p>
+      <a href="https://github.com/Vansh4195/decoder">Source on GitHub</a>
+      &middot; Built by Vansh Singh
+    </p>
+  </footer>
+
+  <!-- ============ API KEY DIALOG ============ -->
+  <div id="keyDialog" class="dialog-backdrop" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="keyDialogTitle">
+      <h2 id="keyDialogTitle">Anthropic API key</h2>
+      <p class="dialog-text">
+        The Explain and Generate features call the Claude API directly from your browser.
+        Paste your own key below. It is saved in this browser only (<code>localStorage</code>)
+        and sent only to <code>api.anthropic.com</code>.
+      </p>
+      <div class="field">
+        <label for="keyInput">API key</label>
+        <input id="keyInput" class="input mono" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+      </div>
+      <label class="checkbox-row">
+        <input id="keyShow" type="checkbox" /> <span>Show key</span>
+      </label>
+      <p class="dialog-text small">
+        Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.
+        Browser calls use Anthropic's direct-browser-access opt-in, which Decoder sends for you.
+      </p>
+      <div class="dialog-actions">
+        <button id="keyClear" class="btn btn-ghost" type="button">Remove key</button>
+        <div class="dialog-actions-right">
+          <button id="keyCancel" class="btn btn-ghost" type="button">Cancel</button>
+          <button id="keySave" class="btn btn-primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
