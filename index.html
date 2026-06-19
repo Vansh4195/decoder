@@ -170,7 +170,8 @@
   <footer class="footer">
     <p>
       Decoder runs entirely in your browser. Your API key is stored only in this browser's
-      <code>localStorage</code> and is sent directly to Anthropic — never to any other server.
+      <code>localStorage</code> and is sent directly to your chosen LLM provider
+      (Anthropic or Google Gemini) — never to any other server.
     </p>
     <p>
       <a href="https://github.com/Vansh4195/decoder">Source on GitHub</a>
@@ -181,12 +182,19 @@
   <!-- ============ API KEY DIALOG ============ -->
   <div id="keyDialog" class="dialog-backdrop" hidden>
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="keyDialogTitle">
-      <h2 id="keyDialogTitle">Anthropic API key</h2>
+      <h2 id="keyDialogTitle">LLM provider &amp; API key</h2>
       <p class="dialog-text">
-        The Explain and Generate features call the Claude API directly from your browser.
-        Paste your own key below. It is saved in this browser only (<code>localStorage</code>)
-        and sent only to <code>api.anthropic.com</code>.
+        The Explain and Generate features call an LLM directly from your browser.
+        Pick a provider and paste your own key. Each key is saved in this browser only
+        (<code>localStorage</code>) and sent only to that provider.
       </p>
+      <div class="field">
+        <label for="providerSelect">Provider</label>
+        <select id="providerSelect" class="input">
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="gemini">Gemini (free)</option>
+        </select>
+      </div>
       <div class="field">
         <label for="keyInput">API key</label>
         <input id="keyInput" class="input mono" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
@@ -195,8 +203,8 @@
         <input id="keyShow" type="checkbox" /> <span>Show key</span>
       </label>
       <p class="dialog-text small">
-        Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.
-        Browser calls use Anthropic's direct-browser-access opt-in, which Decoder sends for you.
+        Get a key at <a id="keyGetLink" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.
+        <span id="keyProviderNote">Browser calls use Anthropic's direct-browser-access opt-in, which Decoder sends for you.</span>
       </p>
       <div class="dialog-actions">
         <button id="keyClear" class="btn btn-ghost" type="button">Remove key</button>
